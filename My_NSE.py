@@ -4,6 +4,7 @@ import pandas as pd
 import pdb
 import sys
 from time import sleep
+import easygui
 #from nsetools import Nse
 
 DELTA_1 = 800
@@ -12,9 +13,12 @@ SYMBOL = "NIFTY"
 URL = 'https://www.nseindia.com/api/option-chain-indices?symbol=' + SYMBOL
 DAJS = {}
 headers = {'User-Agent': 'Mozilla/5.0'}
+PREV_PE_DELTA = 0
 
 
 def fetch_oi(expiry_dt):
+    global PREV_PE_DELTA
+    
     ce_values = [data['CE'] for data in DAJS['records']['data'] if "CE" in data and data['expiryDate'] == expiry_dt]
     pe_values = [data['PE'] for data in DAJS['records']['data'] if "PE" in data and data['expiryDate'] == expiry_dt]
 
@@ -61,6 +65,12 @@ def fetch_oi(expiry_dt):
     print(pe.iloc[pe_del2_pos])
     #print(f"\n\nCalls delta: {ce_final_delta}")
     print(f"\n\nPUTS delta: {pe_final_delta}\n\n")
+    
+    if PREV_PE_DELTA != pe_final_delta and pe_final_delta > 50:
+        PREV_PE_DELTA = pe_final_delta
+        easygui.msgbox(f"PUTS delta: {pe_final_delta}", title="ALERT")
+        print("Triggered alert")
+
 
 def main():
     global DAJS
@@ -77,21 +87,30 @@ def main():
             pass
         sleep(2)
     """
-    #expiry_dt = '24-Jun-2021'
-    expiry_dt = sys.argv[1]
-    
-    found = False
-    while found is False:
-        try:
-            page = requests.get(URL, headers=headers)
-            if page.status_code == 200:
-                found = True
-        except:
-            pass
+    expiry_dt = '24-Jun-2021'
+    #expiry_dt = sys.argv[1]
+    loop = True
+    while loop:
+        found = False
+        while found is False:
+            try:
+                page = requests.get(URL, headers=headers)
+                if page.status_code == 200:
+                    found = True
+            except:
+                pass
+            
+        DAJS = json.loads(page.text)
         
-    DAJS = json.loads(page.text)
-    
-    fetch_oi(expiry_dt)
+        fetch_oi(expiry_dt)
+        
+        try:
+            sleep(6)
+        except KeyboardInterrupt:
+            loop = False
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
